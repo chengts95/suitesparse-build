@@ -93,17 +93,17 @@ jobs:
           path: _deps/SuiteSparse
           fetch-depth: 1
 
+      - name: Set up swap space
+        if: runner.os == 'Linux' && steps.settings.outputs.profile == 'full'
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          # Allocate 4GB swap space to prevent GCC OOM during GraphBLAS FactoryKernel compilation
-          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
           free -h
-
           sudo apt-get update
           sudo apt-get install -y \
             cmake ninja-build \
