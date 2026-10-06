@@ -72,8 +72,8 @@ jobs:
 
           if [[ "$PROFILE" == "full" ]]; then
             if [[ "${{ runner.os }}" == "Windows" ]]; then
-              # SPEX requires GMP/MPFR which is not bundled on Windows; build all other projects
-              PROJECTS="AMD;BTF;CAMD;CCOLAMD;CHOLMOD;COLAMD;CXSparse;GraphBLAS;KLU;LDL;RBio;SPQR;UMFPACK;ParU;Mongoose"
+              # SPEX requires GNU GMP/MPFR; SuiteSparse project names must be lowercase
+              PROJECTS="amd;btf;camd;ccolamd;cholmod;colamd;cxsparse;graphblas;klu;ldl;rbio;spqr;umfpack;paru;mongoose"
             else
               PROJECTS="all"
             fi
