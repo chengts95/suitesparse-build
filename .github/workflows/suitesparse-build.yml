@@ -71,7 +71,12 @@ jobs:
           SS_REF="${{ inputs.suitesparse_ref || env.DEFAULT_SUITESPARSE_REF }}"
 
           if [[ "$PROFILE" == "full" ]]; then
-            PROJECTS="all"
+            if [[ "${{ runner.os }}" == "Windows" ]]; then
+              # SPEX requires GMP/MPFR which is not bundled on Windows; build all other projects
+              PROJECTS="AMD;BTF;CAMD;CCOLAMD;CHOLMOD;COLAMD;CXSparse;GraphBLAS;KLU;LDL;RBio;SPQR;UMFPACK;ParU;Mongoose"
+            else
+              PROJECTS="all"
+            fi
           else
             PROJECTS="klu"
           fi
