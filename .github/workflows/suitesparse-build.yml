@@ -97,6 +97,13 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          # Allocate 4GB swap space to prevent GCC OOM during GraphBLAS FactoryKernel compilation
+          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
           sudo apt-get update
           sudo apt-get install -y \
             cmake ninja-build \
@@ -168,9 +175,11 @@ jobs:
       - name: Build SuiteSparse
         shell: bash
         run: |
-          PARALLEL_FLAG="--parallel"
+          PARALLEL_FLAG="--parallel 2"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             PARALLEL_FLAG="--parallel 3"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            PARALLEL_FLAG="--parallel"
           fi
           cmake --build _build/SuiteSparse --config Release $PARALLEL_FLAG
 
