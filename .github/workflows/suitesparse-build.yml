@@ -89,16 +89,28 @@ jobs:
           fetch-depth: 1
 
       - name: Install Linux dependencies
-        if: runner.os == 'Linux' && steps.settings.outputs.profile == 'full'
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             cmake ninja-build \
-            libblas-dev liblapack-dev \
-            libgmp-dev libmpfr-dev \
-            libmetis-dev \
-            libomp-dev
+            libblas-dev liblapack-dev
+          if [[ "${{ steps.settings.outputs.profile }}" == "full" ]]; then
+            sudo apt-get install -y \
+              libgmp-dev libmpfr-dev \
+              libmetis-dev \
+              libomp-dev
+          fi
+
+      - name: Install Windows OpenBLAS
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          curl -sL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28-x64.zip -o openblas.zip
+          mkdir -p "C:/openblas"
+          unzip -q -o openblas.zip -d "C:/openblas"
+          echo "C:/openblas/bin" >> "$GITHUB_PATH"
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS' && steps.settings.outputs.profile == 'full'
@@ -116,6 +128,15 @@ jobs:
       - name: Configure SuiteSparse
         shell: bash
         run: |
+          EXTRA_ARGS=()
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            EXTRA_ARGS+=(
+              "-DBLAS_LIBRARIES=C:/openblas/lib/libopenblas.lib"
+              "-DLAPACK_LIBRARIES=C:/openblas/lib/libopenblas.lib"
+              "-DCMAKE_PREFIX_PATH=C:/openblas"
+            )
+          fi
+
           cmake \
             -S _deps/SuiteSparse \
             -B _build/SuiteSparse \
@@ -124,7 +145,8 @@ jobs:
             -DSUITESPARSE_ENABLE_PROJECTS="${{ steps.settings.outputs.projects }}" \
             -DBUILD_SHARED_LIBS=ON \
             -DBUILD_STATIC_LIBS=ON \
-            -DSUITESPARSE_USE_CUDA=OFF
+            -DSUITESPARSE_USE_CUDA=OFF \
+            "${EXTRA_ARGS[@]}"
 
       - name: Build SuiteSparse
         shell: bash
