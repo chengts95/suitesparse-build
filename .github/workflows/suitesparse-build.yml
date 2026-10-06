@@ -110,7 +110,9 @@ jobs:
           curl -sL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28-x64.zip -o openblas.zip
           mkdir -p "C:/openblas"
           unzip -q -o openblas.zip -d "C:/openblas"
+          cp C:/openblas/bin/*.dll C:/openblas/lib/ || true
           echo "C:/openblas/bin" >> "$GITHUB_PATH"
+          echo "C:/openblas/lib" >> "$GITHUB_PATH"
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS' && steps.settings.outputs.profile == 'full'
@@ -130,7 +132,9 @@ jobs:
         run: |
           EXTRA_ARGS=()
           if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PATH="C:/openblas/bin:C:/openblas/lib:$PATH"
             EXTRA_ARGS+=(
+              "-DBLA_VENDOR=OpenBLAS"
               "-DBLAS_LIBRARIES=C:/openblas/lib/libopenblas.lib"
               "-DLAPACK_LIBRARIES=C:/openblas/lib/libopenblas.lib"
               "-DCMAKE_PREFIX_PATH=C:/openblas"
