@@ -110,7 +110,13 @@ jobs:
           curl -sL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28-x64.zip -o openblas.zip
           mkdir -p "C:/openblas"
           unzip -q -o openblas.zip -d "C:/openblas"
-          cp C:/openblas/bin/*.dll C:/openblas/lib/ || true
+          mkdir -p "C:/openblas/lib"
+          cp "C:/openblas/libopenblas.lib" "C:/openblas/lib/libopenblas.lib" || true
+          cp "C:/openblas/libopenblas.lib" "C:/openblas/lib/openblas.lib" || true
+          cp "C:/openblas/bin/"*.dll "C:/openblas/lib/" || true
+          cp "C:/openblas/bin/"*.dll "C:/Windows/System32/" || true
+          ls -la "C:/openblas"
+          ls -la "C:/openblas/lib"
           echo "C:/openblas/bin" >> "$GITHUB_PATH"
           echo "C:/openblas/lib" >> "$GITHUB_PATH"
 
@@ -138,6 +144,8 @@ jobs:
               "-DBLAS_LIBRARIES=C:/openblas/lib/libopenblas.lib"
               "-DLAPACK_LIBRARIES=C:/openblas/lib/libopenblas.lib"
               "-DCMAKE_PREFIX_PATH=C:/openblas"
+              "-DCMAKE_INCLUDE_PATH=C:/openblas/include"
+              "-DCMAKE_LIBRARY_PATH=C:/openblas/lib"
             )
           fi
 
