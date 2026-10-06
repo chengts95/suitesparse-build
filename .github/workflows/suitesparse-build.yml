@@ -1,0 +1,174 @@
+name: SuiteSparse Cloud Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Build profile: klu (minimum) or full (all SuiteSparse projects)"
+        required: true
+        default: "klu"
+        type: choice
+        options:
+          - klu
+          - full
+      suitesparse_ref:
+        description: "SuiteSparse git tag/ref"
+        required: true
+        default: "v7.14.1"
+        type: string
+
+  pull_request:
+    paths:
+      - ".github/workflows/suitesparse-build.yml"
+      - "ci/**"
+
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/suitesparse-build.yml"
+      - "ci/**"
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_SUITESPARSE_REF: v7.14.1
+
+jobs:
+  build:
+    name: "${{ matrix.name }} / ${{ inputs.profile || 'klu' }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+
+          - name: windows-x86_64
+            os: windows-latest
+            platform: windows
+            arch: x86_64
+
+          - name: macos-arm64
+            os: macos-15
+            platform: macos
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve build settings
+        id: settings
+        shell: bash
+        run: |
+          PROFILE="${{ inputs.profile || 'klu' }}"
+          SS_REF="${{ inputs.suitesparse_ref || env.DEFAULT_SUITESPARSE_REF }}"
+
+          if [[ "$PROFILE" == "full" ]]; then
+            PROJECTS="all"
+          else
+            PROJECTS="klu"
+          fi
+
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          echo "projects=$PROJECTS" >> "$GITHUB_OUTPUT"
+          echo "suitesparse_ref=$SS_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout SuiteSparse
+        uses: actions/checkout@v4
+        with:
+          repository: DrTimothyAldenDavis/SuiteSparse
+          ref: ${{ steps.settings.outputs.suitesparse_ref }}
+          path: _deps/SuiteSparse
+          fetch-depth: 1
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux' && steps.settings.outputs.profile == 'full'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build \
+            libblas-dev liblapack-dev \
+            libgmp-dev libmpfr-dev \
+            libmetis-dev \
+            libomp-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS' && steps.settings.outputs.profile == 'full'
+        shell: bash
+        run: |
+          brew update
+          brew install \
+            openblas \
+            lapack \
+            gmp \
+            mpfr \
+            metis \
+            libomp
+
+      - name: Configure SuiteSparse
+        shell: bash
+        run: |
+          cmake \
+            -S _deps/SuiteSparse \
+            -B _build/SuiteSparse \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/_install/suitesparse" \
+            -DSUITESPARSE_ENABLE_PROJECTS="${{ steps.settings.outputs.projects }}" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_STATIC_LIBS=ON \
+            -DSUITESPARSE_USE_CUDA=OFF
+
+      - name: Build SuiteSparse
+        shell: bash
+        run: |
+          cmake --build _build/SuiteSparse --config Release --parallel
+
+      - name: Install SuiteSparse
+        shell: bash
+        run: |
+          cmake --install _build/SuiteSparse --config Release
+
+      - name: Run KLU smoke test
+        shell: bash
+        run: |
+          python ci/smoke_test/run_smoke_test.py --install-dir _install/suitesparse
+
+      - name: Collect license and metadata
+        shell: bash
+        run: |
+          mkdir -p _install/suitesparse/licenses
+          cp _deps/SuiteSparse/LICENSE.txt _install/suitesparse/licenses/ || true
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("_install/suitesparse")
+          metadata = {
+              "suitesparse_version": "${{ steps.settings.outputs.suitesparse_ref }}",
+              "platform": "${{ matrix.platform }}",
+              "arch": "${{ matrix.arch }}",
+              "profile": "${{ steps.settings.outputs.profile }}",
+              "projects": "${{ steps.settings.outputs.projects }}",
+              "build_type": "Release",
+              "static": True,
+              "shared": True,
+              "cuda": False
+          }
+          (root / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload SuiteSparse artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: suitesparse-${{ steps.settings.outputs.suitesparse_ref }}-${{ matrix.name }}-${{ steps.settings.outputs.profile }}
+          path: _install/suitesparse
+          if-no-files-found: error
+          retention-days: 14

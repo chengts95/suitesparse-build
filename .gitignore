@@ -1,0 +1,6 @@
+_deps/
+_build/
+_install/
+__pycache__/
+*.pyc
+.DS_Store
