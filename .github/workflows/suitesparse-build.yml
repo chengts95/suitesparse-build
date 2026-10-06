@@ -168,7 +168,11 @@ jobs:
       - name: Build SuiteSparse
         shell: bash
         run: |
-          cmake --build _build/SuiteSparse --config Release --parallel
+          PARALLEL_FLAG="--parallel"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            PARALLEL_FLAG="--parallel 3"
+          fi
+          cmake --build _build/SuiteSparse --config Release $PARALLEL_FLAG
 
       - name: Install SuiteSparse
         shell: bash
