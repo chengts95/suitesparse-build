@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-KLU Smoke Test Runner
+KLU & SuiteSparse Smoke Test Runner
 Verifies SuiteSparse installation and runs compile/link/analyze/factor/solve smoke tests.
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run KLU smoke test")
+    parser = argparse.ArgumentParser(description="Run SuiteSparse smoke test")
     parser.add_argument(
         "--install-dir",
         type=Path,
@@ -26,10 +26,17 @@ def parse_args():
         default=Path("_build/klu_smoke"),
         help="Build directory for the smoke test",
     )
+    parser.add_argument(
+        "--profile",
+        type=str,
+        default="klu",
+        choices=["klu", "full"],
+        help="Profile to verify: klu or full",
+    )
     return parser.parse_args()
 
 
-def check_files(install_dir: Path):
+def check_files(install_dir: Path, profile: str = "klu"):
     print("=== 1. Checking installed files ===")
     if not install_dir.exists():
         sys.exit(f"Error: install directory '{install_dir}' does not exist")
@@ -68,6 +75,24 @@ def check_files(install_dir: Path):
     if not shared_libs:
         print("Warning: No shared KLU library candidate identified.")
 
+    if profile == "full":
+        print("\n=== Checking full SuiteSparse suite components ===")
+        expected_headers = ["umfpack.h", "cholmod.h", "suitesparseqr.h", "graphblas.h"]
+        for exp in expected_headers:
+            found = [p for p in all_files if p.name.lower() == exp]
+            if found:
+                print(f"  [PASS] Component header found: {exp} -> {found[0]}")
+            else:
+                print(f"  [INFO] Optional/Component header not found: {exp}")
+
+        expected_libs = ["umfpack", "cholmod", "spqr", "graphblas"]
+        for exp in expected_libs:
+            found = [p for p in all_files if exp in p.name.lower() and p.suffix in (".a", ".so", ".dylib", ".lib", ".dll")]
+            if found:
+                print(f"  [PASS] Component library found: {exp} ({len(found)} file(s))")
+            else:
+                print(f"  [INFO] Optional/Component library not found: {exp}")
+
     return headers[0].parent
 
 
@@ -104,7 +129,6 @@ def build_and_run(install_dir: Path, build_dir: Path):
         sys.exit(f"Error: CMake build failed with exit code {res.returncode}")
 
     print("\n=== 3. Executing smoke test binaries ===")
-    # Look for built executables
     executables = []
     for pattern in ["klu_smoke_shared*", "klu_smoke_static*", "klu_smoke_direct*"]:
         for p in build_dir.rglob(pattern):
@@ -118,7 +142,6 @@ def build_and_run(install_dir: Path, build_dir: Path):
     if not executables:
         sys.exit("Error: No smoke test executables were built")
 
-    # Set up runtime environment
     env = os.environ.copy()
     bin_dir = (install_dir / "bin").resolve()
     lib_dir = (install_dir / "lib").resolve()
@@ -148,12 +171,12 @@ def build_and_run(install_dir: Path, build_dir: Path):
 
         passed += 1
 
-    print(f"\nAll {passed} KLU smoke test target(s) passed successfully!")
+    print(f"\nAll {passed} smoke test target(s) passed successfully!")
 
 
 def main():
     args = parse_args()
-    check_files(args.install_dir)
+    check_files(args.install_dir, args.profile)
     build_and_run(args.install_dir, args.build_dir)
 
 
